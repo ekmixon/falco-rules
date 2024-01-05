@@ -26,7 +26,7 @@ def arg_parser():
 def rules_to_df(rules_dir):
     l = []
     for rules_filename in os.listdir(rules_dir):
-        if not 'falco' in rules_filename:
+        if 'falco' not in rules_filename:
             continue
         with open(os.path.join(rules_dir, rules_filename), 'r') as f:
             items = yaml.safe_load(f)
@@ -38,22 +38,27 @@ def rules_to_df(rules_dir):
                             if i.startswith('maturity_'):
                                 item['maturity'].append(i) # should be just one per rule, be resilient and treat as list as well
                             elif i.startswith('PCI_DSS_'):
-                                item['compliance_pci_dss'].append('[{}]({})'.format(i, BASE_PCI_DSS))
+                                item['compliance_pci_dss'].append(f'[{i}]({BASE_PCI_DSS})')
                             elif i.startswith('NIST_800-53_'):
                                 # NIST links: revisit in the future, could be fragile
-                                item['compliance_nist'].append('[{}]({}{}/{})'.format(i, BASE_NIST, re.search('NIST_800-53_(.*)-', i, re.IGNORECASE).group(1).lower(), \
-                                    i.replace('NIST_800-53_', '').lower()))
+                                item['compliance_nist'].append(
+                                    f"[{i}]({BASE_NIST}{re.search('NIST_800-53_(.*)-', i, re.IGNORECASE).group(1).lower()}/{i.replace('NIST_800-53_', '').lower()})"
+                                )
                             elif i in ['host', 'container']:
                                 item['workload'].append(i)
                             elif i.startswith('mitre_'):
                                 item['mitre_phase'].append(i)
                             elif i.startswith('T'):
                                 if i.startswith('TA'):
-                                    item['mitre_ttp'].append('[{}]({}{})'.format(i, BASE_MITRE_URL_TACTIC, i.replace('.', '/')))
+                                    item['mitre_ttp'].append(
+                                        f"[{i}]({BASE_MITRE_URL_TACTIC}{i.replace('.', '/')})"
+                                    )
                                 else:
-                                    item['mitre_ttp'].append('[{}]({}{})'.format(i, BASE_MITRE_URL_TECHNIQUE, i.replace('.', '/')))
+                                    item['mitre_ttp'].append(
+                                        f"[{i}]({BASE_MITRE_URL_TECHNIQUE}{i.replace('.', '/')})"
+                                    )
                             else:
-                                item['extra_tags'].append(i) 
+                                item['extra_tags'].append(i)
                         item['workload'].sort()
                         item['mitre_phase'].sort()
                         item['mitre_ttp'].sort()
@@ -63,7 +68,7 @@ def rules_to_df(rules_dir):
                         item['extra_tags_list'] = item['extra_tags']
                         item['compliance_pci_dss_list'] = item['compliance_pci_dss']
                         item['compliance_nist_list'] = item['compliance_nist']
-                        item['enabled'] = (item['enabled'] if 'enabled' in item else True) 
+                        item['enabled'] = (item['enabled'] if 'enabled' in item else True)
                         l.append([', '.join(item[x]) if x in ['maturity', 'workload', 'mitre_phase', 'mitre_ttp', 'compliance_pci_dss', 'compliance_nist', 'extra_tags'] else item[x] for x in COLUMNS])
 
     if not l:
@@ -94,29 +99,31 @@ def print_markdown(df):
     df_deprecated = df_overview[(df_overview[maturity_col_name] == 'maturity_deprecated')]
 
     print('# Falco Rules Overview\n')
-    print('Last Updated: {}\n'.format(datetime.date.today()))
+    print(f'Last Updated: {datetime.date.today()}\n')
     print('This auto-generated document is derived from the `falco*_rules.yaml` files within the [rules](https://github.com/falcosecurity/rules/blob/main/rules/) directory of the main branch in the official Falco [rules repository](https://github.com/falcosecurity/rules/tree/main).\n')
-    print('The Falco project maintains a total of {} [rules](https://github.com/falcosecurity/rules/blob/main/rules/), of which {} rules are included in the default Falco package and labeled with [maturity_stable](https://github.com/falcosecurity/rules/blob/main/CONTRIBUTING.md#rules-maturity-framework). Rules at the remaining maturity levels may need extra customization to ensure effective adoption. Consequently, certain rules are intentionally disabled by default, irrespective of their maturity level.\n'.format(n_rules, len(df_stable)))
+    print(
+        f'The Falco project maintains a total of {n_rules} [rules](https://github.com/falcosecurity/rules/blob/main/rules/), of which {len(df_stable)} rules are included in the default Falco package and labeled with [maturity_stable](https://github.com/falcosecurity/rules/blob/main/CONTRIBUTING.md#rules-maturity-framework). Rules at the remaining maturity levels may need extra customization to ensure effective adoption. Consequently, certain rules are intentionally disabled by default, irrespective of their maturity level.\n'
+    )
     print('This document provides an extensive overview of community-contributed syscall and container event-based rules. It offers resources for learning about these rules, promoting successful adoption, and driving future enhancements.\n')
     print('\n[Stable Falco Rules](#stable-falco-rules) | [Incubating Falco Rules](#incubating-falco-rules) | [Sandbox Falco Rules](#sandbox-falco-rules) | [Deprecated Falco Rules](#deprecated-falco-rules) | [Falco Rules Stats](#falco-rules-stats)\n')
     print('\nThe tables below can be scrolled to the right.\n')
-    
+
     print('\n## Stable Falco Rules\n')
     print('\n{} stable Falco rules ({:.2f}% of rules) are enabled by default:\n'.format(len(df_stable), (100.0 * len(df_stable) / n_rules)))
     print(df_stable.to_markdown(index=False))
-    
+
     print('\n## Incubating Falco Rules\n')
     print('\n{} incubating Falco rules ({:.2f}% of rules):\n'.format(len(df_incubating), (100.0 * len(df_incubating) / n_rules)))
     print(df_incubating.to_markdown(index=False))
-    
+
     print('\n## Sandbox Falco Rules\n')
     print('\n{} sandbox Falco rules ({:.2f}% of rules):\n'.format(len(df_sandbox), (100.0 * len(df_sandbox) / n_rules)))
     print(df_sandbox.to_markdown(index=False))
-    
+
     print('\n## Deprecated Falco Rules\n')
     print('\n{} deprecated Falco rules ({:.2f}% of rules):\n'.format(len(df_deprecated), (100.0 * len(df_deprecated) / n_rules)))
     print(df_deprecated.to_markdown(index=False))
-    
+
     print('\n# Falco Rules Stats\n')
     print('\n### Falco rules per workload type:\n')
     df1 = df.groupby('workload').agg(rule_count=('workload', 'count'))
@@ -135,7 +142,7 @@ def print_markdown(df):
     df2['<div style=\"width:450px\">rules</div>'] = df2['rule'].apply(lambda x: x[0])
     df2['<div style=\"width:100px\">percentage</div>'] = df2['rule'].apply(lambda x: round((100.0 * x[1] / n_rules), 2)).astype(str) + '%'
     print(df2.drop('rule', axis=1).to_markdown(index=True))
-    
+
     print('\n### Compliance-related Falco rules:\n')
     df3 = df
     df3['compliance_tag'] = df['compliance_pci_dss_list'] + df['compliance_nist_list']
